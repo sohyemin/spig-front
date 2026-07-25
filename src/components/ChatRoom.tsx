@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { SignalingMessage } from "../types/signaling";
+import { useWebRTC } from "../hooks/useWebRTC";
 
 interface ChatRoomProps {
   socket: WebSocket;
@@ -8,22 +9,15 @@ interface ChatRoomProps {
   onLeave: () => void;
 }
 
+
 export default function ChatRoom({
   socket,
   roomId,
   role,
   onLeave,
 }: ChatRoomProps) {
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-
-  const localStreamRef = useRef<MediaStream | null>(null);
-
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
-
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-
-  // PeerConnection과 미디어가 준비됐는지 확인
-  const peerReadyRef = useRef(false);
 
   // 준비 전에 READY가 도착했는지 저장
   const readyReceivedRef = useRef(false);
@@ -32,351 +26,215 @@ export default function ChatRoom({
   const pendingOfferRef =
     useRef<RTCSessionDescriptionInit | null>(null);
 
-  // remoteDescription 전에 도착한 ICE 저장
-  const pendingIceCandidatesRef =
-    useRef<RTCIceCandidateInit[]>([]);
+  const mediaReadyRef = useRef(false);
+
+  const {
+    localMediaStream,
+    remoteMediaStream,
+  
+    setUpLocalStream,
+  
+    createOffer,
+    setRemoteOffer,
+  
+    createAnswer,
+    setRemoteAnswer,
+  
+    iceCandidate,
+    addIceCandidate
+  } = useWebRTC();
+
+  const sendMessage = (message: SignalingMessage) => {
+    if (socket.readyState !== WebSocket.OPEN) {
+      console.warn("WebSocket이 열려 있지 않습니다.");
+      return;
+    }
+
+    socket.send(JSON.stringify(message));
+  };
+
+  const sendOffer = async () => {
+    if (!mediaReadyRef.current) {
+      console.log("미디어 준비 전이므로 OFFER 생성을 보류합니다.");
+      readyReceivedRef.current = true;
+      return;
+    }
+
+    const offer = await createOffer();
+
+    sendMessage({
+      type: "OFFER",
+      roomId,
+      data: offer,
+    });
+
+    console.log("OFFER 전송 완료");
+  };
+
+  const handleOffer = async(
+    offer: RTCSessionDescriptionInit,
+  ) => {
+    if(!mediaReadyRef.current){
+      console.log("미디어 준비 전이므로 OFFER을 저장합니다.")
+      pendingOfferRef.current = offer;
+      return;
+    }
+
+    await setRemoteOffer(offer);
+
+    const answer = await createAnswer();
+
+    sendMessage({
+      type:"ANSWER",
+      roomId,
+      data : answer
+    })
+
+    console.log("ANSWER 전송 완료");
+  }
+
+  const handleAnswer = async(
+    answer: RTCSessionDescriptionInit,
+  ) => {
+    await setRemoteAnswer(answer);
+    console.log("ANSWER 적용 완료")
+  }
+
+  // 1. 로컬 카메라와 마이크 준비
 
   useEffect(() => {
     let disposed = false;
 
-    const sendMessage = (message: SignalingMessage) => {
-      if (socket.readyState !== WebSocket.OPEN) {
-        console.warn("WebSocket이 열려 있지 않습니다.");
-        return; 
-      }
-
-      socket.send(JSON.stringify(message));
-    };
-
-    const flushPendingIceCandidates = async (
-      peerConnection: RTCPeerConnection,
-    ) => {
-      const candidates =
-        pendingIceCandidatesRef.current;
-
-      pendingIceCandidatesRef.current = [];
-
-      for (const candidate of candidates) {
-        await peerConnection.addIceCandidate(candidate);
-      }
-    };
-
-    const createOffer = async () => {
-      const peerConnection = peerConnectionRef.current;
-
-      if (!peerConnection || !peerReadyRef.current) {
-        console.log("PeerConnection 준비 전이므로 OFFER 보류");
-        readyReceivedRef.current = true;
-        return;
-      }
-
-      console.log(
-        "OFFER 생성 전 Sender:",
-        peerConnection.getSenders().map((sender) => ({
-          kind: sender.track?.kind,
-          readyState: sender.track?.readyState,
-        })),
-      );
-
-      const offer = await peerConnection.createOffer();
-
-      await peerConnection.setLocalDescription(offer);
-
-      if (!peerConnection.localDescription) {
-        throw new Error("LocalDescription 생성 실패");
-      }
-
-      sendMessage({
-        type: "OFFER",
-        roomId,
-        data: peerConnection.localDescription,
-      });
-
-      console.log("OFFER 전송 완료");
-    };
-
-    const handleOffer = async (
-      offer: RTCSessionDescriptionInit,
-    ) => {
-      const peerConnection = peerConnectionRef.current;
-
-      if (!peerConnection || !peerReadyRef.current) {
-        console.log("PeerConnection 준비 전이므로 OFFER 저장");
-        pendingOfferRef.current = offer;
-        return;
-      }
-
-      await peerConnection.setRemoteDescription(offer);
-
-      await flushPendingIceCandidates(peerConnection);
-
-      const answer = await peerConnection.createAnswer();
-
-      await peerConnection.setLocalDescription(answer);
-
-      if (!peerConnection.localDescription) {
-        throw new Error("ANSWER LocalDescription 생성 실패");
-      }
-
-      sendMessage({
-        type: "ANSWER",
-        roomId,
-        data: peerConnection.localDescription,
-      });
-
-      console.log("ANSWER 전송 완료");
-    };
-
-    const handleAnswer = async (
-      answer: RTCSessionDescriptionInit,
-    ) => {
-      const peerConnection = peerConnectionRef.current;
-
-      if (!peerConnection) {
-        console.warn("ANSWER 처리 시 PeerConnection이 없습니다.");
-        return;
-      }
-
-      await peerConnection.setRemoteDescription(answer);
-
-      await flushPendingIceCandidates(peerConnection);
-
-      console.log("ANSWER 적용 완료");
-    };
-
-    const handleIceCandidate = async (
-      candidate: RTCIceCandidateInit,
-    ) => {
-      const peerConnection = peerConnectionRef.current;
-
-      if (!peerConnection) {
-        pendingIceCandidatesRef.current.push(candidate);
-        return;
-      }
-
-      // RemoteDescription 전에 addIceCandidate를 호출하면
-      // 오류가 발생할 수 있으므로 임시 저장
-      if (!peerConnection.remoteDescription) {
-        console.log("RemoteDescription 전 ICE 후보 저장");
-        pendingIceCandidatesRef.current.push(candidate);
-        return;
-      }
-
-      await peerConnection.addIceCandidate(candidate);
-
-      console.log("ICE Candidate 적용 완료");
-    };
-
-    const handleSocketMessage = async (
-      event: MessageEvent<string>,
-    ) => {
+    const InitializeMedia = async () => {
       try {
-        const message =
-          JSON.parse(event.data) as SignalingMessage;
+        await setUpLocalStream();
 
-        switch (message.type) {
-          case "READY":
-            if (role === "CALLER") {
-              readyReceivedRef.current = true;
-
-              if (peerReadyRef.current) {
-                await createOffer();
-              }
-            }
-            break;
-
-          case "OFFER":
-            await handleOffer(message.data);
-            break;
-
-          case "ANSWER":
-            await handleAnswer(message.data);
-            break;
-
-          case "ICE_CANDIDATE":
-            await handleIceCandidate(message.data);
-            break;
-
-          case "LEAVE":
-            console.log("상대방이 퇴장했습니다.");
-            break;
-
-          default:
-            break;
-        }
-      } catch (error) {
-        console.error(
-          "시그널링 메시지 처리 실패:",
-          error,
-        );
-      }
-    };
-
-    socket.addEventListener(
-      "message",
-      handleSocketMessage,
-    );
-
-    const initializePeerConnection = async () => {
-      try {
-        const peerConnection =
-          new RTCPeerConnection({
-            iceServers: [
-              {
-                urls: "stun:stun.l.google.com:19302",
-              },
-            ],
-          });
-
-        peerConnectionRef.current = peerConnection;
-
-        peerConnection.ontrack = (event) => {
-          console.log(
-            "ontrack 실행:",
-            event.track.kind,
-            event.streams,
-          );
-
-          const remoteStream = event.streams[0];
-
-          if (
-            remoteVideoRef.current &&
-            remoteStream
-          ) {
-            remoteVideoRef.current.srcObject =
-              remoteStream;
-
-            void remoteVideoRef.current
-              .play()
-              .catch((error) => {
-                console.warn(
-                  "원격 영상 자동 재생 실패:",
-                  error,
-                );
-              });
-          }
-        };
-
-        peerConnection.onicecandidate = (event) => {
-          if (!event.candidate) {
-            console.log("ICE 후보 수집 완료");
-            return;
-          }
-
-          sendMessage({
-            type: "ICE_CANDIDATE",
-            roomId,
-            data: event.candidate.toJSON(),
-          });
-        };
-
-        peerConnection.onconnectionstatechange = () => {
-          console.log(
-            "connectionState:",
-            peerConnection.connectionState,
-          );
-        };
-
-        peerConnection.oniceconnectionstatechange =
-          () => {
-            console.log(
-              "iceConnectionState:",
-              peerConnection.iceConnectionState,
-            );
-          };
-
-        const localStream =
-          await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
-          });
-
-        if (disposed) {
-          localStream
-            .getTracks()
-            .forEach((track) => track.stop());
-
-          peerConnection.close();
+        if(disposed){
           return;
         }
 
-        localStreamRef.current = localStream;
+        mediaReadyRef.current = true;
 
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject =
-            localStream;
-        }
-
-        localStream.getTracks().forEach((track) => {
-          peerConnection.addTrack(
-            track,
-            localStream,
-          );
-        });
-
-        peerReadyRef.current = true;
-
-        console.log(
-          "등록된 Sender:",
-          peerConnection.getSenders().map(
-            (sender) => ({
-              kind: sender.track?.kind,
-              readyState:
-                sender.track?.readyState,
-            }),
-          ),
-        );
-
-        // 초기화 전에 OFFER가 도착한 경우 처리
-        if (pendingOfferRef.current) {
-          const pendingOffer =
-            pendingOfferRef.current;
-
+        // 미디어 준비 전에 OFFER가 도착한 경우
+        if(pendingOfferRef.current){
+          const offer = pendingOfferRef.current;
           pendingOfferRef.current = null;
 
-          await handleOffer(pendingOffer);
+          await handleOffer(offer);
+          return;
         }
 
-        // 초기화 전에 READY가 도착한 경우 처리
+        // 미디어 준비 전에 READY가 도착한 경우 
         if (
           role === "CALLER" &&
           readyReceivedRef.current
         ) {
-          await createOffer();
+          readyReceivedRef.current = false
+          await sendOffer();
         }
       } catch (error) {
-        console.error(
-          "PeerConnection 초기화 실패:",
-          error,
-        );
+        console.error("로컬 미디어 초기화 실패 : ", error);
       }
     };
 
-    void initializePeerConnection();
+      void InitializeMedia();
 
-    return () => {
-      disposed = true;
+      return() => {
+        disposed = true;
+        mediaReadyRef.current = false;
+        readyReceivedRef.current = false;
+        pendingOfferRef.current = null;
+      };
+    }, [role]);
 
-      socket.removeEventListener(
+    // 2. 로컬 MediaStream을 video 요소에 연결
+    useEffect(() => {
+      if(!localVideoRef.current){
+        return;
+      }
+
+      localVideoRef.current.srcObject = localMediaStream;
+    }, [localMediaStream]);
+
+    // 3. 원격 mediaStream을 video 요소에 연결
+    useEffect(() => {
+      if(!remoteVideoRef.current){
+        return;
+      }
+
+      remoteVideoRef.current.srcObject = remoteMediaStream;
+    }, [remoteMediaStream]);
+
+    // 4. Hook에서 ICE 후보가 생성되어 상대방에게 전달
+    useEffect(() => {
+      if(!iceCandidate){
+        return;
+      }
+
+      sendMessage({
+        type:"ICE_CANDIDATE",
+        roomId,
+        data:iceCandidate
+      });
+    }, [iceCandidate, roomId, socket]);
+
+    // 5. WebSocket 시그널링 메시지 처리
+    useEffect(() => {
+      const handleSocketMessage = async(
+        event:MessageEvent<string>,
+      ) => {
+        try{
+          const message = JSON.parse(event.data) as SignalingMessage;
+          
+          switch(message.type){
+            case "READY":
+              if(role!=="CALLER"){
+                break;
+              }
+
+              if(!mediaReadyRef.current){
+                readyReceivedRef.current = true;
+                break;
+              }
+              
+              await sendOffer();
+              break;
+            case "OFFER":
+              await handleOffer(
+                message.data as RTCSessionDescription
+              );
+              break;
+            case "ANSWER":
+              await handleAnswer(
+                message.data as RTCSessionDescription
+              )
+              break;
+            case "ICE_CANDIDATE":
+              await addIceCandidate(
+                message.data as RTCIceCandidate
+              )
+              break;
+            case "LEAVE":
+              console.log("상대방이 퇴장했습니다.")
+              break;
+          }
+        } catch(error){
+          console.error(error);
+        };
+      }
+
+      socket.addEventListener(
         "message",
-        handleSocketMessage,
+        handleSocketMessage
       );
 
-      peerReadyRef.current = false;
-      readyReceivedRef.current = false;
-      pendingOfferRef.current = null;
-      pendingIceCandidatesRef.current = [];
-
-      localStreamRef.current
-        ?.getTracks()
-        .forEach((track) => track.stop());
-
-      localStreamRef.current = null;
-
-      peerConnectionRef.current?.close();
-      peerConnectionRef.current = null;
-    };
-  }, [roomId, role, socket]);
+      return () => {
+        socket.removeEventListener(
+          "message",
+          handleSocketMessage
+        );
+      };
+    }, [socket, roomId, role]);
 
   return (
     <section>
