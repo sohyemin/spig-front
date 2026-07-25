@@ -1,19 +1,16 @@
-import Header from './components/Header'
-import Hero from './components/Hero'
-import Features from './components/Features'
-import ChatbotWidget from './components/ChatbotWidget'
+import { Routes, Route, BrowserRouter } from 'react-router-dom'
 import Footer from './components/Footer'
+import RoomPage from './pages/chatRoom/RoomPage'
+import HomePage from './pages/home/HomePage'
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white">
-      <Header />
-      <main>
-        <Hero />
-        <Features />
-        <ChatbotWidget />
-      </main>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/room" element={<RoomPage />} />
+      </Routes>
       <Footer />
-    </div>
+    </BrowserRouter>
   )
 }
