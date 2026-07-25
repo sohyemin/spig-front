@@ -89,7 +89,7 @@ export const useWebRTC = () => {
     // SDP answer 생성
     // Local Description에 설정
     const createAnswer = async (): Promise<RTCSessionDescriptionInit> => {
-        const answer = await peerConnectionRef.current!.createOffer();
+        const answer = await peerConnectionRef.current!.createAnswer();
         await peerConnectionRef.current!.setLocalDescription(answer);
 
         return answer;
