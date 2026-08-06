@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-brand-pink-light bg-white/80 backdrop-blur">
@@ -12,6 +14,9 @@ export default function Header() {
           <a href="#chatbot" className="transition hover:text-brand-pink-dark">
             챗봇 체험
           </a>
+          <Link to="/login" className="transition hover:text-brand-pink-dark">
+            로그인
+          </Link>
           <a
             href="#chatbot"
             className="rounded-full bg-brand-pink px-4 py-2 text-white transition hover:bg-brand-pink-dark"

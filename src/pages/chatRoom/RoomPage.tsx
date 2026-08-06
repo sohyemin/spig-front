@@ -4,7 +4,6 @@ import ChatRoom from "../../components/ChatRoom";
 
 const SIGNALING_URL = "ws://localhost:8080/ws/signaling";
 
-
 export default function RoomPage() {
   // WebSocket
   const socketRef = useRef<WebSocket | null>(null);
