@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 export default function SignupPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -28,6 +29,7 @@ export default function SignupPage() {
     try {
       // api 연결
       console.log('TODO: 회원가입 요청', { email, password, nickname })
+      navigate('/login')
     } finally {
       setIsLoading(false)
     }

@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from "react"
+import type { Role } from "../types/signaling"
+import type { ChatMessage } from "../types/chat"
 
-export const useWebRTC = () => {
+export const useWebRTC = (role: Role) => {
     // RTCConnection을 담을 객체 생성
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+    const dataChannelRef = useRef<RTCDataChannel | null>(null);
 
     // Media Stream State
     const [localMediaStream, setlocalMediaStream] = useState<MediaStream | null>(null);
@@ -11,10 +14,45 @@ export const useWebRTC = () => {
     // ICE Candidate State
     const [iceCandidate, setIceCandidate] = useState<RTCIceCandidate | null>(null);
 
+    // ICE 연결 상태 (상대방 이탈 감지용)
+    const [iceConnectionState, setIceConnectionState] =
+        useState<RTCIceConnectionState>("new");
+
+    // 일반채팅(DataChannel) 상태
+    const [isChatChannelOpen, setIsChatChannelOpen] = useState(false);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
     useEffect(function init() {
         const peerConnection = new RTCPeerConnection({
             iceServers: [{ urls : "stun:stun.l.google.com:19302",}]
         });
+
+        const setupDataChannel = (channel: RTCDataChannel) => {
+            dataChannelRef.current = channel;
+
+            channel.onopen = () => setIsChatChannelOpen(true);
+            channel.onclose = () => setIsChatChannelOpen(false);
+            channel.onmessage = (event: MessageEvent<string>) => {
+                setChatMessages((prev) => [
+                    ...prev,
+                    {
+                        id: crypto.randomUUID(),
+                        sender: "peer",
+                        text: event.data,
+                        timestamp: Date.now(),
+                    },
+                ]);
+            };
+        };
+
+        // CALLER는 offer 생성 전에 채널을 만들어야 SDP 협상에 자동으로 포함됨
+        if (role === "CALLER") {
+            setupDataChannel(peerConnection.createDataChannel("chat"));
+        } else {
+            peerConnection.ondatachannel = (event) => {
+                setupDataChannel(event.channel);
+            };
+        }
 
         //handle remote media steam when receive from peer
         peerConnection.ontrack = (event) => {
@@ -27,24 +65,26 @@ export const useWebRTC = () => {
               console.log("ICE 후보 수집 완료");
               return;
             }
-  
+
             setIceCandidate(event.candidate);
         };
 
-        peerConnection.oniceconnectionstatechange = 
+        peerConnection.oniceconnectionstatechange =
         () => {
             console.log(
                 "iceConnectionState : ",
                 peerConnection.iceConnectionState
             );
+            setIceConnectionState(peerConnection.iceConnectionState);
         };
 
         peerConnectionRef.current = peerConnection;
 
         return () => {
+            dataChannelRef.current = null;
             peerConnection.close();
         };
-    }, [])
+    }, [role])
 
     const setUpLocalStream = async () => {
         const constraints = {
@@ -52,7 +92,7 @@ export const useWebRTC = () => {
             audio : true,
         };
 
-        const localStream = 
+        const localStream =
         await navigator.mediaDevices.getUserMedia(constraints);
         setlocalMediaStream(localStream)
 
@@ -62,13 +102,13 @@ export const useWebRTC = () => {
                 peerConnectionRef.current?.addTrack(track, localStream);
             });
     }
-    
+
     useEffect(function cleanUp(){
         return() => {
             if(localMediaStream){
                 localMediaStream.getTracks().forEach(track => track.stop());
             }
-        }   
+        }
     }, [localMediaStream])
 
     // SDP offer 생성
@@ -106,6 +146,31 @@ export const useWebRTC = () => {
         await peerConnectionRef.current?.addIceCandidate(candidate);
     };
 
+    // 상대방에게 일반채팅 메시지 전송 (DataChannel)
+    const sendChatMessage = (text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        const channel = dataChannelRef.current;
+        if (!channel || channel.readyState !== "open") {
+            console.warn("데이터 채널이 아직 열려있지 않습니다.");
+            return;
+        }
+
+        channel.send(trimmed);
+        setChatMessages((prev) => [
+            ...prev,
+            {
+                id: crypto.randomUUID(),
+                sender: "me",
+                text: trimmed,
+                timestamp: Date.now(),
+            },
+        ]);
+    };
+
     return{
             localMediaStream,
         remoteMediaStream,
@@ -119,6 +184,11 @@ export const useWebRTC = () => {
         setRemoteAnswer,
 
         iceCandidate,
-        addIceCandidate
+        addIceCandidate,
+
+        iceConnectionState,
+        isChatChannelOpen,
+        chatMessages,
+        sendChatMessage,
     };
 }

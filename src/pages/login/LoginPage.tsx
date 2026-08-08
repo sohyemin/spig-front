@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const { login } = useAuth()
+  const navigate = useNavigate()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -21,6 +24,8 @@ export default function LoginPage() {
     try {
       // TODO: 백엔드 로그인 API 연동 (예: src/api/auth.ts의 login 함수 호출)
       console.log('TODO: 로그인 요청', { email, password })
+      login(email)
+      navigate('/')
     } finally {
       setIsLoading(false)
     }
