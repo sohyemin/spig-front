@@ -11,7 +11,7 @@ export async function uploadTrainingFile(file: File, token: AuthToken): Promise<
   const formData = new FormData()
   formData.append('file', file)
 
-  const res = await fetch(`${API_BASE_URL}/api/admin/training-files`, {
+  const res = await fetch(`${API_BASE_URL}/api/admin/learning/files`, {
     method: 'POST',
     headers: {
       Authorization: `${token.tokenType} ${token.accessToken}`,
