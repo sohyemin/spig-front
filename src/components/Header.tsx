@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Header() {
-  const { isLoggedIn, logout } = useAuth()
+  const { isLoggedIn, isAdmin, logout } = useAuth()
 
   return (
     <header className="sticky top-0 z-50 border-b border-brand-pink-light bg-white/80 backdrop-blur">
@@ -26,6 +26,11 @@ export default function Header() {
               <Link to="/mypage" className="transition hover:text-brand-pink-dark">
                 마이페이지
               </Link>
+              {isAdmin && (
+                <Link to="/admin" className="transition hover:text-brand-pink-dark">
+                  관리자
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={logout}

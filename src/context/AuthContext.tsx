@@ -5,15 +5,23 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { UserRole } from "../api/auth";
 
 interface AuthUser {
   email: string;
+  accessToken: string;
+  tokenType: string;
+  userRole: UserRole;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isLoggedIn: boolean;
-  login: (email: string) => void;
+  isAdmin: boolean;
+  login: (
+    email: string,
+    token: { accessToken: string; tokenType: string; userRole: UserRole },
+  ) => void;
   logout: () => void;
 }
 
@@ -35,8 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const login = (email: string) => {
-    setUser({ email });
+  const login = (
+    email: string,
+    token: { accessToken: string; tokenType: string; userRole: UserRole },
+  ) => {
+    setUser({
+      email,
+      accessToken: token.accessToken,
+      tokenType: token.tokenType,
+      userRole: token.userRole,
+    });
   };
 
   const logout = () => {
@@ -45,7 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoggedIn: user !== null, login, logout }}
+      value={{
+        user,
+        isLoggedIn: user !== null,
+        isAdmin: user?.userRole === "ADMIN",
+        login,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

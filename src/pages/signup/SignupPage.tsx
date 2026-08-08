@@ -1,19 +1,20 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { signup as signupApi, AuthError } from '../../api/auth'
 
 export default function SignupPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
-  const [nickname, setNickname] = useState('')
+  const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
 
-    if (!email.trim() || !password.trim() || !passwordConfirm.trim() || !nickname.trim()) {
+    if (!email.trim() || !password.trim() || !passwordConfirm.trim() || !name.trim()) {
       setError('모든 항목을 입력해주세요.')
       return
     }
@@ -27,9 +28,14 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      // api 연결
-      console.log('TODO: 회원가입 요청', { email, password, nickname })
+      await signupApi({ email, password, name })
       navigate('/login')
+    } catch (err) {
+      setError(
+        err instanceof AuthError
+          ? err.message
+          : '회원가입에 실패했어요. 잠시 후 다시 시도해주세요.',
+      )
     } finally {
       setIsLoading(false)
     }
@@ -46,16 +52,16 @@ export default function SignupPage() {
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
             <label
-              htmlFor="nickname"
+              htmlFor="name"
               className="mb-1 block text-sm font-medium text-gray-700"
             >
               닉네임
             </label>
             <input
-              id="nickname"
+              id="name"
               type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               placeholder="닉네임을 입력하세요"
               disabled={isLoading}
               className="w-full rounded-full border border-gray-200 px-4 py-2 text-sm outline-none focus:border-brand-pink"

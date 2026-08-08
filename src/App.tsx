@@ -5,6 +5,7 @@ import HomePage from './pages/home/HomePage'
 import LoginPage from './pages/login/LoginPage'
 import SignupPage from './pages/signup/SignupPage'
 import MyPage from './pages/mypage/MyPage'
+import AdminPage from './pages/admin/AdminPage'
 import { AuthProvider } from './context/AuthContext'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/mypage" element={<MyPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
         <Footer />
       </BrowserRouter>

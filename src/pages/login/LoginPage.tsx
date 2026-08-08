@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { login as loginApi, AuthError } from '../../api/auth'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -22,10 +23,15 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      // TODO: 백엔드 로그인 API 연동 (예: src/api/auth.ts의 login 함수 호출)
-      console.log('TODO: 로그인 요청', { email, password })
-      login(email)
+      const { accessToken, tokenType, userRole } = await loginApi(email, password)
+      login(email, { accessToken, tokenType, userRole })
       navigate('/')
+    } catch (err) {
+      setError(
+        err instanceof AuthError
+          ? err.message
+          : '로그인에 실패했어요. 잠시 후 다시 시도해주세요.',
+      )
     } finally {
       setIsLoading(false)
     }
