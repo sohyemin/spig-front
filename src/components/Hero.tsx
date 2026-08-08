@@ -29,10 +29,10 @@ export default function Hero() {
           화상채팅 시작하기
         </Link>
         <a
-          href="#chatbot"
+          href="#features"
           className="rounded-full border border-brand-green px-6 py-3 font-semibold text-brand-green-dark transition hover:bg-brand-green-light"
         >
-          AI 챗봇 체험하기
+          기능 살펴보기
         </a>
       </div>
     </section>

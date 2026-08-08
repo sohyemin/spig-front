@@ -14,9 +14,6 @@ export default function Header() {
           <a href="#features" className="transition hover:text-brand-pink-dark">
             소개
           </a>
-          <a href="#chatbot" className="transition hover:text-brand-pink-dark">
-            챗봇 체험
-          </a>
           <Link
             to={isLoggedIn ? '/room' : '/login'}
             className="transition hover:text-brand-pink-dark"

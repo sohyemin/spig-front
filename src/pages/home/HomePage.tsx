@@ -1,7 +1,6 @@
 import Header from '../../components/Header'
 import Hero from '../../components/Hero'
 import Features from '../../components/Features'
-import ChatbotWidget from '../../components/ChatbotWidget'
 
 export default function HomePage() {
   return (
@@ -10,7 +9,6 @@ export default function HomePage() {
       <main>
         <Hero />
         <Features />
-        <ChatbotWidget />
       </main>
     </div>
   )

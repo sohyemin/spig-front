@@ -44,7 +44,7 @@ export default function Features() {
           </h3>
           <p className="mt-2 text-sm text-gray-600">
             궁금한 표현이나 문법을 물어보면 AI가 학습 자료를 바탕으로 답해줘요.
-            지금 바로 체험할 수 있어요.
+            화상채팅 중 사이드 패널에서 바로 이용할 수 있어요.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {categories.map((c) => (
