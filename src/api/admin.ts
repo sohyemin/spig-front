@@ -73,7 +73,7 @@ const CHUNK_MAX_RETRIES = 2
 
 async function uploadChunkWithRetry(
   uploadId: string,
-  chunkIndex: number,
+  chunkNumber: number,
   chunk: Blob,
   token: AuthToken,
 ): Promise<void> {
@@ -85,13 +85,10 @@ async function uploadChunkWithRetry(
       formData.append('chunk', chunk)
 
       const res = await fetch(
-        `${API_BASE_URL}/api/admin/learning/files/uploads/${uploadId}/chunks/${chunkIndex}`,
+        `${API_BASE_URL}/api/admin/learning/files/uploads/${uploadId}/${chunkNumber}`,
         {
           method: 'PUT',
-          headers: {
-            ...authHeaders(token),
-            "Content-Type": "multipart/form-data",
-          },
+          headers: authHeaders(token),
           body: formData,
         },
       )
@@ -145,8 +142,8 @@ export async function uploadTrainingFileChunked(
   } = initResult;
 
   // 2. 백엔드가 알려준 크기로 파일 분할
-  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-    const start = chunkIndex * chunkSize;
+  for (let chunkNumber = 0; chunkNumber < totalChunks; chunkNumber++) {
+    const start = chunkNumber * chunkSize;
     const end = Math.min(
       start + chunkSize,
       file.size,
@@ -156,14 +153,14 @@ export async function uploadTrainingFileChunked(
 
     console.log({
       uploadId,
-      chunkNumber: chunkIndex,
+      chunkNumber: chunkNumber,
       chunkSize: chunk.size,
     });
 
     // 이후 uploadChunk()를 여기에 연결
-    await uploadChunkWithRetry(uploadId, chunkIndex, chunk, token)
+    await uploadChunkWithRetry(uploadId, chunkNumber, chunk, token)
 
-    onProgress?.(Math.round(((chunkIndex + 1) / totalChunks) * 99))
+    onProgress?.(Math.round(((chunkNumber + 1) / totalChunks) * 99))
   }
 
   const completeRes = await fetch(
