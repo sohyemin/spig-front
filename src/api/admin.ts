@@ -45,9 +45,12 @@ export async function initChunkUpload(
   file: File,
   token: AuthToken,
 ): Promise<ChunkUploadInitResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/admin/learning/files/init`, {
+  const res = await fetch(`${API_BASE_URL}/api/admin/learning/files/uploads`, {
     method: 'POST',
-    headers: authHeaders(token),
+    headers: {
+      ...authHeaders(token),
+      "Content-Type":"application/json"  
+    },
     body: JSON.stringify({
       originalName: file.name,
       contentType:
@@ -62,6 +65,8 @@ export async function initChunkUpload(
     }
     throw new AdminApiError(`파일 업로드에 실패했어요 (status: ${res.status})`)
   }
+
+  console.log(res.json())
 
   return await res.json() as ChunkUploadInitResponse;
 }
@@ -82,9 +87,9 @@ async function uploadChunkWithRetry(
       formData.append('chunk', chunk)
 
       const res = await fetch(
-        `${API_BASE_URL}/api/admin/learning/files/${uploadId}/chunks/${chunkIndex}`,
+        `${API_BASE_URL}/api/admin/learning/files/uploads/${uploadId}/chunks/${chunkIndex}`,
         {
-          method: 'POST',
+          method: 'PUT',
           headers: {
             ...authHeaders(token),
             "Content-Type": "multipart/form-data",
@@ -137,6 +142,12 @@ export async function uploadTrainingFileChunked(
     token,
   );
 
+  console.log({
+    uploadId,
+    chunkSize,
+    totalChunks,
+  });
+
   // 2. 백엔드가 알려준 크기로 파일 분할
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
     const start = chunkIndex * chunkSize;
@@ -160,9 +171,9 @@ export async function uploadTrainingFileChunked(
   }
 
   const completeRes = await fetch(
-    `${API_BASE_URL}/api/admin/learning/files/${uploadId}/complete`,
+    `${API_BASE_URL}/api/admin/learning/files/uploads/${uploadId}/complete`,
     {
-      method: 'POST',
+      method: 'PUT',
       headers: authHeaders(token),
     },
   )
