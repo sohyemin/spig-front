@@ -9,6 +9,33 @@ export interface AuthToken {
   tokenType: string
 }
 
+// 일반 파일 업로드 API
+export async function uploadTrainingFile(
+  file: File,
+  token: AuthToken,
+  onProgress?: (progress: number) => void,
+): Promise<void> {
+  onProgress?.(0)
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(`${API_BASE_URL}/api/admin/learning/files`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: formData,
+  })
+
+  if (!res.ok) {
+    if (res.status === 403) {
+      throw new AdminApiError('관리자 권한이 없어요.')
+    }
+    throw new AdminApiError(`파일 업로드에 실패했어요 (status: ${res.status})`)
+  }
+
+  onProgress?.(100)
+}
+
 function authHeaders(token: AuthToken): HeadersInit {
   return { Authorization: `${token.tokenType} ${token.accessToken}` }
 }
@@ -39,34 +66,6 @@ export async function initChunkUpload(
   return await res.json() as ChunkUploadInitResponse;
 }
 
-
-// 일반 파일 업로드 API
-export async function uploadTrainingFile(
-  file: File,
-  token: AuthToken,
-  onProgress?: (progress: number) => void,
-): Promise<void> {
-  onProgress?.(0)
-
-  const formData = new FormData()
-  formData.append('file', file)
-
-  const res = await fetch(`${API_BASE_URL}/api/admin/learning/files`, {
-    method: 'POST',
-    headers: authHeaders(token),
-    body: formData,
-  })
-
-  if (!res.ok) {
-    if (res.status === 403) {
-      throw new AdminApiError('관리자 권한이 없어요.')
-    }
-    throw new AdminApiError(`파일 업로드에 실패했어요 (status: ${res.status})`)
-  }
-
-  onProgress?.(100)
-}
-
 const CHUNK_MAX_RETRIES = 2
 
 async function uploadChunkWithRetry(
@@ -86,7 +85,10 @@ async function uploadChunkWithRetry(
         `${API_BASE_URL}/api/admin/learning/files/${uploadId}/chunks/${chunkIndex}`,
         {
           method: 'POST',
-          headers: authHeaders(token),
+          headers: {
+            ...authHeaders(token),
+            "Content-Type": "multipart/form-data",
+          },
           body: formData,
         },
       )
@@ -123,6 +125,7 @@ export async function uploadTrainingFileChunked(
   token: AuthToken,
   onProgress?: (progress: number) => void,
 ): Promise<void> {
+  onProgress?.(0)
 
   // 1. init 요청
   const {
@@ -133,8 +136,6 @@ export async function uploadTrainingFileChunked(
     file,
     token,
   );
-
-  onProgress?.(0)
 
   // 2. 백엔드가 알려준 크기로 파일 분할
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -155,7 +156,7 @@ export async function uploadTrainingFileChunked(
     // 이후 uploadChunk()를 여기에 연결
     await uploadChunkWithRetry(uploadId, chunkIndex, chunk, token)
 
-    onProgress?.(Math.round(((chunkIndex + 1) / totalChunks) * 100))
+    onProgress?.(Math.round(((chunkIndex + 1) / totalChunks) * 99))
   }
 
   const completeRes = await fetch(
@@ -174,4 +175,6 @@ export async function uploadTrainingFileChunked(
       `업로드 완료 처리에 실패했어요 (status: ${completeRes.status})`,
     )
   }
+
+  onProgress?.(100);
 }
