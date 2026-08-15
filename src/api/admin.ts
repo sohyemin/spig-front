@@ -66,8 +66,6 @@ export async function initChunkUpload(
     throw new AdminApiError(`파일 업로드에 실패했어요 (status: ${res.status})`)
   }
 
-  console.log(res.json())
-
   return await res.json() as ChunkUploadInitResponse;
 }
 
@@ -133,20 +131,18 @@ export async function uploadTrainingFileChunked(
   onProgress?.(0)
 
   // 1. init 요청
+  const initResult = await initChunkUpload(
+    file,
+    token,
+  );
+  
+  console.log("init 원본 응답:", initResult);
+  
   const {
     uploadId,
     chunkSize,
     totalChunks,
-  } = await initChunkUpload(
-    file,
-    token,
-  );
-
-  console.log({
-    uploadId,
-    chunkSize,
-    totalChunks,
-  });
+  } = initResult;
 
   // 2. 백엔드가 알려준 크기로 파일 분할
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
